@@ -1,0 +1,3 @@
+# 抖音平台配置
+cookie_path: ~/.videopub/douyin_cookie.json
+creator_url: https://creator.douyin.com

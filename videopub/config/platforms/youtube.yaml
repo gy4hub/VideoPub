@@ -1,0 +1,5 @@
+# YouTube 平台配置
+oauth_client_secrets: ~/.videopub/youtube_client_secrets.json
+token_path: ~/.videopub/youtube_token.json
+default_category: "28"  # Science & Technology
+default_privacy: unlisted

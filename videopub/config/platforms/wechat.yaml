@@ -1,0 +1,5 @@
+# 视频号平台配置
+cookie_path: ~/.videopub/wechat_cookie.json
+channels_url: https://channels.weixin.qq.com
+default_original: true
+login_timeout: 120

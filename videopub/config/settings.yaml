@@ -1,0 +1,12 @@
+# VideoPub 全局配置
+watch_folder: ~/videopub/watch_folder
+log_dir: ~/videopub/logs
+upload_timeout: 600
+
+browser:
+  headless: true
+  slow_mo: 100
+
+retry:
+  max_attempts: 3
+  delay_seconds: 30

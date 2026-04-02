@@ -1,0 +1,3 @@
+# Bilibili 平台配置
+cookie_path: ~/.videopub/bilibili_cookie.json
+default_tid: 201  # 科学科普分区
