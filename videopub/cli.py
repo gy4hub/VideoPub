@@ -9,11 +9,22 @@ import click
 from videopub import __version__
 
 
+# ── 主命令组 ─────────────────────────────────────────────────────────────────
+
 @click.group()
 @click.version_option(version=__version__, prog_name="videopub")
-def cli():
+@click.option("--verbose", "-v", is_flag=True, default=False, help="显示 DEBUG 日志")
+@click.pass_context
+def cli(ctx, verbose):
     """VideoPub - 多平台视频发布自动化工具"""
+    from videopub.logging_config import setup_logging
 
+    setup_logging(verbose=verbose)
+    ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
+
+
+# ── upload 命令 ───────────────────────────────────────────────────────────────
 
 @cli.command()
 @click.argument("folder", type=click.Path(exists=True))
@@ -40,14 +51,16 @@ def upload(folder, platform):
 
     click.echo("\n── 上传结果 ──")
     for r in results:
-        status = "✅" if r.success else "❌"
-        line = f"  {status} {r.platform.value}"
+        icon = "✅" if r.success else "❌"
+        line = f"  {icon} {r.platform.value}"
         if r.success and r.video_url:
             line += f"  {r.video_url}"
         elif not r.success and r.error:
             line += f"  {r.error}"
         click.echo(line)
 
+
+# ── watch 命令 ────────────────────────────────────────────────────────────────
 
 @cli.command()
 @click.argument("folder", type=click.Path(exists=True), default=".")
@@ -71,25 +84,25 @@ def watch(folder, platform):
         click.echo("需要安装 watchdog: pip install watchdog", err=True)
         raise SystemExit(1)
 
+    from loguru import logger
+
     selected = list(platform) if platform else None
     watch_path = Path(folder).expanduser().resolve()
-    click.echo(f"👀 监控中: {watch_path}")
+    logger.info(f"监控中: {watch_path}")
     if selected:
-        click.echo(f"   平台过滤: {', '.join(selected)}")
-    click.echo("   按 Ctrl+C 停止\n")
+        logger.info(f"平台过滤: {', '.join(selected)}")
+
+    click.echo(f"👀 监控中: {watch_path}  (Ctrl+C 停止)")
 
     # 已处理过的文件夹（避免重复触发）
     processed: set[Path] = set()
 
     def _trigger(event_path: str):
-        """判断是否需要触发某个文件夹的上传"""
         p = Path(event_path)
-        # 找到触发事件的直接子文件夹
         try:
             rel = p.relative_to(watch_path)
         except ValueError:
             return
-        # 只关心第一层子目录中的文件变化
         parts = rel.parts
         if len(parts) < 1:
             return
@@ -97,17 +110,17 @@ def watch(folder, platform):
         if not sub_dir.is_dir() or sub_dir in processed:
             return
 
-        # 检查该子目录是否满足触发条件（有元数据文件 + 视频文件）
         has_meta = any(
-            sub_dir.glob(f"metadata{ext}") for ext in (".json", ".docx", ".pdf")
+            list(sub_dir.glob(f"metadata{ext}")) for ext in (".json", ".docx", ".pdf")
         ) or bool(list(sub_dir.glob("*.json")))
         has_video = any(
-            sub_dir.glob(f"*{ext}") for ext in (".mp4", ".mov", ".avi", ".mkv")
+            list(sub_dir.glob(f"*{ext}")) for ext in (".mp4", ".mov", ".avi", ".mkv")
         )
 
         if has_meta and has_video:
             processed.add(sub_dir)
-            click.echo(f"📂 检测到新文件夹: {sub_dir.name}")
+            logger.info(f"检测到新文件夹: {sub_dir.name}")
+            click.echo(f"📂 触发上传: {sub_dir.name}")
             asyncio.run(_watch_upload(sub_dir, selected))
 
     class Handler(FileSystemEventHandler):
@@ -131,7 +144,7 @@ def watch(folder, platform):
 
 
 async def _watch_upload(folder: Path, platforms: list[str] | None):
-    """监控模式下触发上传，并输出结果"""
+    """监控模式下触发上传"""
     from videopub.core.orchestrator import process_folder
 
     results = await process_folder(folder, platforms=platforms)
@@ -143,6 +156,8 @@ async def _watch_upload(folder: Path, platforms: list[str] | None):
             + (f"  {r.error}" if not r.success and r.error else "")
         )
 
+
+# ── login 命令 ────────────────────────────────────────────────────────────────
 
 @cli.command()
 @click.argument(
@@ -159,7 +174,6 @@ def login(platform):
 
 
 async def _do_login(platform_name: str):
-    """执行平台登录。"""
     from videopub.core.models import Platform
 
     platform_map = {
@@ -168,15 +182,15 @@ async def _do_login(platform_name: str):
         "douyin": Platform.DOUYIN,
         "wechat": Platform.WECHAT,
     }
-    platform = platform_map[platform_name.lower()]
-
-    uploader = _build_uploader(platform)
+    uploader = _build_uploader(platform_map[platform_name.lower()])
     success = await uploader.login()
     if success:
         click.echo(f"  {platform_name} 登录成功!")
     else:
         click.echo(f"  {platform_name} 登录失败")
 
+
+# ── status 命令 ───────────────────────────────────────────────────────────────
 
 @cli.command()
 def status():
@@ -186,7 +200,6 @@ def status():
 
 
 async def _check_status():
-    """检查所有平台的登录态。"""
     from videopub.core.models import Platform
 
     for platform in Platform:
@@ -199,8 +212,9 @@ async def _check_status():
         click.echo(f"  {platform.value}: {status_text}")
 
 
+# ── 共用工具 ──────────────────────────────────────────────────────────────────
+
 def _build_uploader(platform):
-    """根据 Platform enum 构造对应上传器"""
     from videopub.core.models import Platform
 
     mod_map = {

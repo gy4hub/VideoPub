@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.videopub.watch</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__VIDEOPUB_BIN__</string>
+        <string>watch</string>
+        <string>__WATCH_FOLDER__</string>
+    </array>
+
+    <!-- 登录后自动启动 -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- 崩溃后自动重启 -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- 工作目录 -->
+    <key>WorkingDirectory</key>
+    <string>__WATCH_FOLDER__</string>
+
+    <!-- 日志输出 -->
+    <key>StandardOutPath</key>
+    <string>__LOG_DIR__/launchd_stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__LOG_DIR__/launchd_stderr.log</string>
+
+    <!-- 环境变量（确保 PATH 包含 venv） -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__VENV_BIN__:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>__HOME__</string>
+    </dict>
+</dict>
+</plist>
