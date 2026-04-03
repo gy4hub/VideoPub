@@ -2,6 +2,8 @@
 
 import asyncio
 
+from loguru import logger
+
 
 class WeChatLoginPage:
     """微信视频号登录流程。"""
@@ -42,10 +44,10 @@ class WeChatLoginPage:
         await self.page.goto(self.SELECTORS["login_url"], wait_until="domcontentloaded")
         await self.page.wait_for_timeout(3000)
 
-        print("\n" + "=" * 50)
-        print("请在浏览器中使用微信扫描二维码登录视频号")
-        print(f"超时时间: {timeout} 秒")
-        print("=" * 50 + "\n")
+        logger.info("\n" + "=" * 50)
+        logger.info("请在浏览器中使用微信扫描二维码登录视频号")
+        logger.info(f"超时时间: {timeout} 秒")
+        logger.info("=" * 50)
 
         elapsed = 0
         poll_interval = 2
@@ -61,8 +63,8 @@ class WeChatLoginPage:
             for selector in self.SELECTORS["logged_in_indicators"]:
                 locator = self.page.locator(selector)
                 if await locator.count() > 0:
-                    print("登录成功！")
+                    logger.info("登录成功!")
                     return True
 
-        print("登录超时，请重试")
+        logger.warning("登录超时，请重试")
         return False

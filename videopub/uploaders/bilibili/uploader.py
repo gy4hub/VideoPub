@@ -115,11 +115,10 @@ class BilibiliUploader(BaseUploader):
     async def post_comment(self, video_id: str, comment: str) -> bool:
         """在视频下发布首评"""
         try:
-            client, _ = self._build_client()
-            if self._cookie_data is None:
-                self._cookie_data = self._load_cookie_file()
-            client.login_by_cookie(self._cookie_data)
-            await asyncio.to_thread(client.send_comment, video_id, comment)
-            return True
+            # biliup 暂不支持发评论，如果需要以后可以自己用 requests 调用 
+            # https://api.bilibili.com/x/v2/reply/add 并带上 cookie(bili_jct)
+            from loguru import logger
+            logger.warning("[Bilibili] 暂不支持自动发首评")
+            return False
         except Exception:
             return False

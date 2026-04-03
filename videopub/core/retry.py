@@ -2,6 +2,7 @@
 
 import asyncio
 import functools
+import inspect
 
 from loguru import logger
 
@@ -16,6 +17,8 @@ def retry_on_failure(func):
       delay_seconds: 首次等待秒数，默认 30
       backoff_factor: 指数退避倍率，默认 2.0
     """
+    if not inspect.iscoroutinefunction(func):
+        raise TypeError(f"@retry_on_failure 只能用于 async 函数，但 {func.__name__} 不是")
 
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):

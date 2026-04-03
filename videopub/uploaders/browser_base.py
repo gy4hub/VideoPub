@@ -4,6 +4,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from loguru import logger
+
 from videopub.core.config_loader import load_settings
 
 
@@ -58,34 +60,59 @@ class BrowserManager:
         with self.cookie_path.open("w", encoding="utf-8") as file:
             json.dump(storage, file, ensure_ascii=False, indent=2)
 
-    async def take_screenshot(self, name: str = "screenshot") -> Path:
-        """截图保存到日志目录。"""
+    async def take_screenshot(self, name: str = "screenshot") -> Path | None:
+        """截图保存到日志目录。页面未就绪时返回 None。"""
+        if not self.page:
+            logger.warning("take_screenshot: page 未就绪，跳过截图")
+            return None
         path = self._build_log_path(name, "png")
-        if self.page:
+        try:
             await self.page.screenshot(path=str(path))
+        except Exception as exc:
+            logger.warning(f"take_screenshot 失败: {exc}")
+            return None
         return path
 
-    async def save_page_html(self, name: str = "page") -> Path:
-        """保存页面 HTML 到日志目录。"""
+    async def save_page_html(self, name: str = "page") -> Path | None:
+        """保存页面 HTML 到日志目录。页面未就绪时返回 None。"""
+        if not self.page:
+            logger.warning("save_page_html: page 未就绪，跳过")
+            return None
         path = self._build_log_path(name, "html")
-        if self.page:
+        try:
             content = await self.page.content()
             path.write_text(content, encoding="utf-8")
+        except Exception as exc:
+            logger.warning(f"save_page_html 失败: {exc}")
+            return None
         return path
 
     async def close(self):
-        """关闭页面、上下文与浏览器。"""
-        if self._context:
-            await self._context.close()
-        if self._browser:
-            await self._browser.close()
-        if self._playwright:
-            await self._playwright.stop()
-
-        self._context = None
-        self._browser = None
-        self._playwright = None
+        """关闭页面、上下文与浏览器（顺序：context → browser → playwright）。"""
         self.page = None
+        try:
+            if self._context:
+                await self._context.close()
+        except Exception as exc:
+            logger.warning(f"关闭 context 失败: {exc}")
+        finally:
+            self._context = None
+
+        try:
+            if self._browser:
+                await self._browser.close()
+        except Exception as exc:
+            logger.warning(f"关闭 browser 失败: {exc}")
+        finally:
+            self._browser = None
+
+        try:
+            if self._playwright:
+                await self._playwright.stop()
+        except Exception as exc:
+            logger.warning(f"关闭 playwright 失败: {exc}")
+        finally:
+            self._playwright = None
 
     @staticmethod
     def _build_log_path(name: str, suffix: str) -> Path:

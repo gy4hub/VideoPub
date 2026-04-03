@@ -1,6 +1,7 @@
 """YouTube Data API v3 上传器"""
 
 import asyncio
+from datetime import datetime, timezone
 from pathlib import Path
 
 from videopub.core.config_loader import load_platform_config
@@ -127,8 +128,12 @@ class YouTubeUploader(BaseUploader):
             }
 
             if meta.scheduled_time:
+                # YouTube 要求 RFC 3339 格式（含时区），naive datetime 强制转为 UTC
+                dt = meta.scheduled_time
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
                 body["status"]["privacyStatus"] = "private"
-                body["status"]["publishAt"] = meta.scheduled_time.isoformat()
+                body["status"]["publishAt"] = dt.isoformat()
 
             media = _MediaFileUpload(
                 str(task.video_path),

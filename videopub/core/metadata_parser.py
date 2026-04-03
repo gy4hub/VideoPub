@@ -58,8 +58,9 @@ def _find_metadata_file(folder_path: Path) -> Path:
         if candidates:
             return candidates[0]
 
-    # 也支持任意名字的 json 文件
-    json_files = sorted(folder_path.glob("*.json"))
+    # 也支持任意名字的 json 文件，但明确排除隐藏文件（如 .status 目录下的文件虽然 glob("*.json") 不递归找不到，
+    # 但如果是顶级目录下的隐藏文件，需要排除）
+    json_files = [f for f in sorted(folder_path.glob("*.json")) if not f.name.startswith(".")]
     if json_files:
         return json_files[0]
 

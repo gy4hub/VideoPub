@@ -1,9 +1,11 @@
 """发布调度器：解析元数据 → 分发到各上传器 → 首评 → 状态更新"""
 
+import asyncio
 from pathlib import Path
 
 from loguru import logger
 
+from videopub.core.config_loader import load_settings
 from videopub.core.metadata_parser import parse
 from videopub.core.models import Platform, PlatformTask, UploadResult
 from videopub.core.status import StatusState, read_status, write_status
@@ -38,79 +40,110 @@ async def process_folder(
 
     results: list[UploadResult] = []
 
+    settings = load_settings()
+    upload_timeout = float(settings.get("upload_timeout", 600))
+
     for platform_meta in platform_metas:
         platform = platform_meta.platform
-
-        # 已完成的平台跳过（幂等）
-        current_state = read_status(folder_path, platform)
-        if current_state == StatusState.DONE:
-            logger.info(f"[{platform.value}] 已完成，跳过")
-            continue
-
-        write_status(folder_path, platform, StatusState.UPLOADING)
-        logger.info(f"[{platform.value}] 开始上传...")
-
-        uploader = _get_uploader(platform)
-        if uploader is None:
-            err = f"未找到平台 {platform.value} 的上传器"
-            logger.error(err)
-            write_status(folder_path, platform, StatusState.ERROR, error=err)
-            results.append(UploadResult(platform=platform, success=False, error=err))
-            continue
-
-        # 检查登录态
-        if not await uploader.check_session():
-            logger.warning(f"[{platform.value}] 登录态无效，尝试登录...")
-            if not await uploader.login():
-                err = "登录失败"
-                logger.error(f"[{platform.value}] {err}")
-                write_status(folder_path, platform, StatusState.ERROR, error=err)
-                results.append(UploadResult(platform=platform, success=False, error=err))
-                continue
-
-        # 上传
-        result = await uploader.upload(
-            PlatformTask(
-                video_path=task.video_path,
-                cover_path=task.cover_path,
-                meta=platform_meta,
+        try:
+            result = await _process_one_platform(
+                folder_path, platform_meta, task, upload_timeout
             )
-        )
+        except Exception as exc:
+            logger.error(f"[{platform.value}] 未预期异常: {exc}")
+            write_status(folder_path, platform, StatusState.ERROR, error=str(exc))
+            result = UploadResult(platform=platform, success=False, error=str(exc))
 
-        if result.success:
-            # 发首评
-            if platform_meta.first_comment and result.video_id:
-                comment_ok = await uploader.post_comment(
-                    result.video_id, platform_meta.first_comment
-                )
-                if comment_ok:
-                    logger.success(f"[{platform.value}] 首评发布成功")
-                else:
-                    logger.warning(f"[{platform.value}] 首评发布失败")
-
-            write_status(
-                folder_path,
-                platform,
-                StatusState.DONE,
-                video_id=result.video_id,
-                video_url=result.video_url,
-            )
-            logger.success(
-                f"[{platform.value}] 上传成功"
-                + (f": {result.video_url}" if result.video_url else "")
-            )
-        else:
-            write_status(
-                folder_path,
-                platform,
-                StatusState.ERROR,
-                error=result.error or "未知错误",
-            )
-            logger.error(f"[{platform.value}] 上传失败: {result.error}")
-
-        results.append(result)
+        if result is not None:
+            results.append(result)
 
     return results
+
+
+async def _process_one_platform(
+    folder_path: Path,
+    platform_meta,
+    task,
+    upload_timeout: float,
+) -> UploadResult | None:
+    """处理单个平台，返回 UploadResult 或 None（跳过时）"""
+    platform = platform_meta.platform
+
+    # 已完成的平台跳过（幂等）
+    current_state = read_status(folder_path, platform)
+    if current_state == StatusState.DONE:
+        logger.info(f"[{platform.value}] 已完成，跳过")
+        return None
+
+    write_status(folder_path, platform, StatusState.UPLOADING)
+    logger.info(f"[{platform.value}] 开始上传...")
+
+    uploader = _get_uploader(platform)
+    if uploader is None:
+        err = f"未找到平台 {platform.value} 的上传器"
+        logger.error(err)
+        write_status(folder_path, platform, StatusState.ERROR, error=err)
+        return UploadResult(platform=platform, success=False, error=err)
+
+    # 检查登录态
+    if not await uploader.check_session():
+        logger.warning(f"[{platform.value}] 登录态无效，尝试登录...")
+        if not await uploader.login():
+            err = "登录失败"
+            logger.error(f"[{platform.value}] {err}")
+            write_status(folder_path, platform, StatusState.ERROR, error=err)
+            return UploadResult(platform=platform, success=False, error=err)
+
+    # 上传（带超时保护）
+    try:
+        result = await asyncio.wait_for(
+            uploader.upload(
+                PlatformTask(
+                    video_path=task.video_path,
+                    cover_path=task.cover_path,
+                    meta=platform_meta,
+                )
+            ),
+            timeout=upload_timeout,
+        )
+    except asyncio.TimeoutError:
+        err = f"上传超时（>{upload_timeout:.0f}s）"
+        logger.error(f"[{platform.value}] {err}")
+        write_status(folder_path, platform, StatusState.ERROR, error=err)
+        return UploadResult(platform=platform, success=False, error=err)
+
+    if result.success:
+        # 发首评
+        if platform_meta.first_comment and result.video_id:
+            comment_ok = await uploader.post_comment(
+                result.video_id, platform_meta.first_comment
+            )
+            if comment_ok:
+                logger.success(f"[{platform.value}] 首评发布成功")
+            else:
+                logger.warning(f"[{platform.value}] 首评发布失败")
+
+        write_status(
+            folder_path,
+            platform,
+            StatusState.DONE,
+            video_id=result.video_id,
+            video_url=result.video_url,
+        )
+        logger.success(
+            f"[{platform.value}] 上传成功"
+            + (f": {result.video_url}" if result.video_url else "")
+        )
+    else:
+        write_status(
+            folder_path,
+            platform,
+            StatusState.ERROR,
+            error=result.error or "未知错误",
+        )
+        logger.error(f"[{platform.value}] 上传失败: {result.error}")
+
+    return result
 
 
 def _get_uploader(platform: Platform):

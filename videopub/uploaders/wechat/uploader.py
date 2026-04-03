@@ -59,6 +59,8 @@ class WeChatUploader(BaseUploader):
             await upload_page.upload_video(str(task.video_path))
             await upload_page.fill_title(meta.title)
 
+            if meta.description:
+                await upload_page.fill_description(meta.description)
             if meta.tags:
                 await upload_page.add_tags(meta.tags)
             if meta.short_title:
