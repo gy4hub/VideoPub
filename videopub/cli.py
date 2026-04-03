@@ -71,9 +71,14 @@ async def _do_upload(task, platforms):
             from videopub.uploaders.bilibili.uploader import BilibiliUploader
 
             uploaders[platform_meta.platform] = BilibiliUploader()
-        else:
-            click.echo(f"  {platform_meta.platform.value}: 跳过（Sprint 2 中实现）")
-            continue
+        elif platform_meta.platform == Platform.DOUYIN:
+            from videopub.uploaders.douyin.uploader import DouyinUploader
+
+            uploaders[platform_meta.platform] = DouyinUploader()
+        elif platform_meta.platform == Platform.WECHAT:
+            from videopub.uploaders.wechat.uploader import WeChatUploader
+
+            uploaders[platform_meta.platform] = WeChatUploader()
 
     for platform_meta in platforms:
         uploader = uploaders.get(platform_meta.platform)
@@ -130,14 +135,75 @@ def login(platform):
 
     PLATFORM: 平台名称
     """
+    import asyncio
+
     click.echo(f"登录平台: {platform}")
-    click.echo("（登录功能将在 Sprint 1-2 中实现）")
+    asyncio.run(_do_login(platform))
+
+
+async def _do_login(platform_name: str):
+    """执行平台登录。"""
+    from videopub.core.models import Platform
+
+    platform_map = {
+        "youtube": Platform.YOUTUBE,
+        "bilibili": Platform.BILIBILI,
+        "douyin": Platform.DOUYIN,
+        "wechat": Platform.WECHAT,
+    }
+    platform = platform_map[platform_name.lower()]
+
+    if platform == Platform.YOUTUBE:
+        from videopub.uploaders.youtube.uploader import YouTubeUploader
+
+        uploader = YouTubeUploader()
+    elif platform == Platform.BILIBILI:
+        from videopub.uploaders.bilibili.uploader import BilibiliUploader
+
+        uploader = BilibiliUploader()
+    elif platform == Platform.DOUYIN:
+        from videopub.uploaders.douyin.uploader import DouyinUploader
+
+        uploader = DouyinUploader()
+    elif platform == Platform.WECHAT:
+        from videopub.uploaders.wechat.uploader import WeChatUploader
+
+        uploader = WeChatUploader()
+
+    success = await uploader.login()
+    if success:
+        click.echo(f"  {platform_name} 登录成功!")
+    else:
+        click.echo(f"  {platform_name} 登录失败")
 
 
 @cli.command()
 def status():
     """检查各平台的登录状态"""
+    import asyncio
+
     click.echo("各平台登录状态：")
-    for platform in ["wechat", "douyin", "bilibili", "youtube"]:
-        click.echo(f"  {platform}: 未配置")
-    click.echo("（状态检查将在 Sprint 1-2 中实现）")
+    asyncio.run(_check_status())
+
+
+async def _check_status():
+    """检查所有平台的登录态。"""
+    import importlib
+
+    platforms_info = [
+        ("youtube", "videopub.uploaders.youtube.uploader", "YouTubeUploader"),
+        ("bilibili", "videopub.uploaders.bilibili.uploader", "BilibiliUploader"),
+        ("douyin", "videopub.uploaders.douyin.uploader", "DouyinUploader"),
+        ("wechat", "videopub.uploaders.wechat.uploader", "WeChatUploader"),
+    ]
+
+    for name, module_path, class_name in platforms_info:
+        try:
+            module = importlib.import_module(module_path)
+            uploader_class = getattr(module, class_name)
+            uploader = uploader_class()
+            valid = await uploader.check_session()
+            status_text = "已登录" if valid else "未登录/已过期"
+        except Exception:
+            status_text = "检查失败"
+        click.echo(f"  {name}: {status_text}")

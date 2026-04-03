@@ -19,6 +19,7 @@ dependencies = [
     "google-auth-oauthlib>=1.0",
     "google-auth>=2.0",
     "biliup>=0.4",
+    "playwright>=1.40",
 ]
 
 [project.optional-dependencies]
