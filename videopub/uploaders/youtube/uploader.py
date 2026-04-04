@@ -1,10 +1,14 @@
 """YouTube Data API v3 上传器"""
 
 import asyncio
+import mimetypes
 from datetime import datetime, timezone
 from pathlib import Path
 
+from loguru import logger
+
 from videopub.core.config_loader import load_platform_config
+from videopub.core.cover_utils import ensure_portrait_safe_cover, ensure_youtube_cover
 from videopub.core.models import Platform, PlatformTask, UploadResult
 from videopub.uploaders.base import BaseUploader
 
@@ -106,38 +110,58 @@ class YouTubeUploader(BaseUploader):
             self.service = _build("youtube", "v3", credentials=self.credentials)
         return self.service
 
+    def _local_timezone(self):
+        """返回当前机器的本地时区"""
+        return datetime.now().astimezone().tzinfo or timezone.utc
+
+    def _guess_mimetype(self, path: Path, fallback: str) -> str:
+        """根据文件后缀推断 MIME 类型"""
+        guessed, _ = mimetypes.guess_type(str(path))
+        return guessed or fallback
+
+    def _resolve_category_id(self, category: str | None) -> str:
+        """解析 YouTube 分类 ID，非数字时回退默认分类"""
+        if category and str(category).strip().isdigit():
+            return str(category).strip()
+        return str(self.config.get("default_category", "28"))
+
+    def _build_video_body(self, task: PlatformTask):
+        """构造 YouTube videos.insert 的请求体"""
+        meta = task.meta
+        privacy = self.config.get("default_privacy", "unlisted")
+        body = {
+            "snippet": {
+                "title": meta.title,
+                "description": meta.description,
+                "tags": meta.tags,
+                "categoryId": self._resolve_category_id(meta.category),
+            },
+            "status": {
+                "privacyStatus": privacy,
+                "selfDeclaredMadeForKids": False,
+            },
+        }
+
+        if meta.scheduled_time:
+            dt = meta.scheduled_time
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=self._local_timezone())
+            body["status"]["privacyStatus"] = "private"
+            body["status"]["publishAt"] = dt.isoformat()
+
+        return body
+
     async def upload(self, task: PlatformTask) -> UploadResult:
         """上传视频到 YouTube"""
         _ensure_google_imports()
 
         try:
             service = self._get_service()
-            meta = task.meta
-            privacy = self.config.get("default_privacy", "unlisted")
-            body = {
-                "snippet": {
-                    "title": meta.title,
-                    "description": meta.description,
-                    "tags": meta.tags,
-                    "categoryId": meta.category or self.config.get("default_category", "28"),
-                },
-                "status": {
-                    "privacyStatus": privacy,
-                    "selfDeclaredMadeForKids": False,
-                },
-            }
-
-            if meta.scheduled_time:
-                # YouTube 要求 RFC 3339 格式（含时区），naive datetime 强制转为 UTC
-                dt = meta.scheduled_time
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                body["status"]["privacyStatus"] = "private"
-                body["status"]["publishAt"] = dt.isoformat()
+            body = self._build_video_body(task)
 
             media = _MediaFileUpload(
                 str(task.video_path),
-                mimetype="video/*",
+                mimetype=self._guess_mimetype(task.video_path, "video/mp4"),
                 resumable=True,
                 chunksize=10 * 1024 * 1024,
             )
@@ -151,7 +175,12 @@ class YouTubeUploader(BaseUploader):
             video_id = response["id"]
 
             if task.cover_path.exists():
-                await self._upload_thumbnail(service, video_id, task.cover_path)
+                try:
+                    cover_path = await asyncio.to_thread(ensure_portrait_safe_cover, task.cover_path)
+                    cover_path = await asyncio.to_thread(ensure_youtube_cover, cover_path)
+                    await self._upload_thumbnail(service, video_id, cover_path)
+                except Exception as exc:
+                    logger.warning(f"[YouTube] 封面上传失败，保留已上传视频: {exc}")
 
             return UploadResult(
                 platform=Platform.YOUTUBE,
@@ -176,7 +205,10 @@ class YouTubeUploader(BaseUploader):
     async def _upload_thumbnail(self, service, video_id: str, cover_path: Path):
         """上传视频封面"""
         _ensure_google_imports()
-        media = _MediaFileUpload(str(cover_path), mimetype="image/*")
+        media = _MediaFileUpload(
+            str(cover_path),
+            mimetype=self._guess_mimetype(cover_path, "image/jpeg"),
+        )
         request = service.thumbnails().set(videoId=video_id, media_body=media)
         await asyncio.to_thread(request.execute)
 

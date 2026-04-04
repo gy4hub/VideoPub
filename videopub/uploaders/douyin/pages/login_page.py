@@ -8,10 +8,18 @@ class DouyinLoginPage:
     """抖音创作者中心登录流程。"""
 
     SELECTORS = {
-        "login_url": "https://creator.douyin.com",
-        "logged_in_indicator": "[class*='avatar'], [class*='user-info']",
-        "qrcode_login": "text=扫码登录",
-        "qrcode_image": "img[src*='qrcode']",
+        "home_url": "https://creator.douyin.com/creator-micro/home",
+        "logged_in_indicators": [
+            "text=高清发布",
+            "text=发布视频",
+            "text=内容管理",
+        ],
+        "login_page_indicators": [
+            "text=扫码登录",
+            "text=验证码登录",
+            "text=密码登录",
+            "img[src*='qrcode']",
+        ],
     }
 
     def __init__(self, page):
@@ -19,22 +27,31 @@ class DouyinLoginPage:
 
     async def is_logged_in(self) -> bool:
         """检查当前页面是否已登录。"""
-        await self.page.goto(self.SELECTORS["login_url"], wait_until="domcontentloaded")
+        await self.page.goto(self.SELECTORS["home_url"], wait_until="domcontentloaded")
         await self.page.wait_for_timeout(3000)
 
         current_url = self.page.url
         if "login" in current_url or "passport" in current_url:
             return False
 
-        indicator = self.page.locator(self.SELECTORS["logged_in_indicator"])
-        return await indicator.count() > 0
+        for selector in self.SELECTORS["login_page_indicators"]:
+            locator = self.page.locator(selector)
+            if await locator.count() > 0 and await locator.first.is_visible():
+                return False
+
+        for selector in self.SELECTORS["logged_in_indicators"]:
+            locator = self.page.locator(selector)
+            if await locator.count() > 0 and await locator.first.is_visible():
+                return True
+
+        return False
 
     async def wait_for_qrcode_scan(self, timeout: int = 120) -> bool:
         """等待用户扫码完成登录。"""
-        await self.page.goto(self.SELECTORS["login_url"], wait_until="domcontentloaded")
+        await self.page.goto("https://creator.douyin.com", wait_until="domcontentloaded")
         await self.page.wait_for_timeout(3000)
 
-        qrcode_login = self.page.locator(self.SELECTORS["qrcode_login"])
+        qrcode_login = self.page.locator("text=扫码登录")
         if await qrcode_login.count() > 0:
             await qrcode_login.first.click()
             await self.page.wait_for_timeout(1000)
@@ -45,15 +62,15 @@ class DouyinLoginPage:
         logger.info("=" * 50)
 
         try:
-            # 等待登录成功的特定元素出现
-            # 这个 wait_for_selector 会在元素存在（无论是否可见）时就返回，如果加上 state="visible" 更保险
-            await self.page.wait_for_selector(
-                self.SELECTORS["logged_in_indicator"],
-                state="visible",
-                timeout=timeout * 1000,
-            )
-            logger.info("登录成功!")
-            return True
+            elapsed = 0
+            while elapsed < timeout:
+                await asyncio.sleep(2)
+                elapsed += 2
+                if await self.is_logged_in():
+                    logger.info("登录成功!")
+                    return True
         except Exception:
-            logger.warning("登录超时或异常，请重试")
-            return False
+            pass
+
+        logger.warning("登录超时或异常，请重试")
+        return False

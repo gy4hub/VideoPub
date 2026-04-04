@@ -12,3 +12,5 @@ watch_folder/
 *.cookie
 *.token
 .venv/
+.playwright-cli/
+output/

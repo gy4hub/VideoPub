@@ -80,12 +80,30 @@ class TestParseKvText:
         task = _parse_kv_text(text, tmp_path)
         assert task.platforms[0].tags == ["a", "b", "c", "d"]
 
+    def test_tags_split_hashtag_style(self, tmp_path):
+        (tmp_path / "video.mp4").write_bytes(b"x")
+        (tmp_path / "cover.jpg").write_bytes(b"x")
+        text = "[微信视频号]\n标题: t\n描述: d\n标签: #血压计 #高血压 #健康"
+        task = _parse_kv_text(text, tmp_path)
+        assert task.platforms[0].tags == ["血压计", "高血压", "健康"]
+
     def test_is_original_false(self, tmp_path):
         (tmp_path / "video.mp4").write_bytes(b"x")
         (tmp_path / "cover.jpg").write_bytes(b"x")
         text = "[bilibili]\n标题: t\n描述: d\n标签: x\n是否原创: 否"
         task = _parse_kv_text(text, tmp_path)
         assert task.platforms[0].is_original is False
+
+    def test_fullwidth_colon_and_wechat_collection_fallback(self, tmp_path):
+        (tmp_path / "video.mp4").write_bytes(b"x")
+        (tmp_path / "cover.jpg").write_bytes(b"x")
+        text = "[微信视频号]\n标题: t\n短标题：短标题\n描述: d\n分类：家庭健康避坑\n定时发布：2026-04-05 21:00"
+        task = _parse_kv_text(text, tmp_path)
+        wechat = task.platforms[0]
+        assert wechat.short_title == "短标题"
+        assert wechat.collection == "家庭健康避坑"
+        assert wechat.scheduled_time is not None
+        assert wechat.scheduled_time.hour == 21
 
     def test_video_auto_find_when_no_path(self, tmp_path):
         (tmp_path / "my_video.mp4").write_bytes(b"x")

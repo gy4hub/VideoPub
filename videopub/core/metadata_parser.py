@@ -39,6 +39,8 @@ FIELD_ALIASES: dict[str, str] = {
     "tags": "tags",
     "分类": "category",
     "category": "category",
+    "合集": "collection",
+    "collection": "collection",
     "首评": "first_comment",
     "first_comment": "first_comment",
     "是否原创": "is_original",
@@ -79,10 +81,16 @@ def _find_video_file(folder_path: Path) -> Path:
 
 def _find_cover_file(folder_path: Path) -> Path:
     """在文件夹中查找封面图"""
+    candidates: list[Path] = []
     for ext in (".jpg", ".jpeg", ".png", ".webp"):
-        candidates = sorted(folder_path.glob(f"*{ext}"))
-        if candidates:
-            return candidates[0]
+        candidates.extend(sorted(folder_path.glob(f"*{ext}")))
+
+    if candidates:
+        preferred = [
+            path for path in candidates
+            if any(keyword in path.stem.lower() for keyword in ("cover", "封面"))
+        ]
+        return preferred[0] if preferred else candidates[0]
 
     raise FileNotFoundError(f"在 {folder_path} 中未找到封面图")
 
@@ -128,7 +136,10 @@ def _cast_field_value(field: str, raw: str):
     """将字段值从字符串转换为合适的类型"""
     raw = raw.strip()
     if field == "tags":
-        return [t.strip() for t in re.split(r"[,，、]", raw) if t.strip()]
+        hashtag_tags = [t.strip() for t in re.findall(r"#([^\s#，,、]+)", raw) if t.strip()]
+        if hashtag_tags:
+            return hashtag_tags
+        return [t.strip().lstrip("#") for t in re.split(r"[,，、]", raw) if t.strip()]
     if field == "is_original":
         return raw.lower() not in ("false", "否", "0", "no")
     if field == "scheduled_time":
@@ -169,6 +180,7 @@ def _parse_json(file_path: Path, folder_path: Path) -> PublishTask:
             is_original=platform_data.get("is_original", True),
             scheduled_time=platform_data.get("scheduled_time"),
             category=platform_data.get("category"),
+            collection=platform_data.get("collection"),
             extra=platform_data.get("extra", {}),
         )
         platforms.append(platform_meta)
@@ -212,6 +224,9 @@ def _parse_kv_text(text: str, folder_path: Path) -> PublishTask:
         if current_platform_raw and current_fields:
             try:
                 plat = _parse_platform(current_platform_raw)
+                collection = current_fields.get("collection")
+                if collection is None and plat == Platform.WECHAT:
+                    collection = current_fields.get("category")
                 # 必填字段默认值
                 meta = PlatformMeta(
                     platform=plat,
@@ -223,6 +238,7 @@ def _parse_kv_text(text: str, folder_path: Path) -> PublishTask:
                     is_original=current_fields.get("is_original", True),
                     scheduled_time=current_fields.get("scheduled_time"),
                     category=current_fields.get("category"),
+                    collection=collection,
                 )
                 platforms.append(meta)
             except Exception:
@@ -244,9 +260,11 @@ def _parse_kv_text(text: str, folder_path: Path) -> PublishTask:
             current_fields = {}
             continue
 
-        # key: value
-        if ":" in stripped:
-            key, _, value = stripped.partition(":")
+        # key: value / key：value
+        m_kv = re.match(r"^([^:：]+)\s*[:：]\s*(.*)$", stripped)
+        if m_kv:
+            key = m_kv.group(1)
+            value = m_kv.group(2)
             field = _normalize_field(key)
             if field is None:
                 continue

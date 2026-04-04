@@ -28,6 +28,7 @@ class PlatformMeta(BaseModel):
     is_original: bool = True
     scheduled_time: datetime | None = None
     category: str | None = None
+    collection: str | None = None
     extra: dict = Field(default_factory=dict)
 
 

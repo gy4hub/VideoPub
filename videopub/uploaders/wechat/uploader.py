@@ -1,6 +1,9 @@
 """视频号 Playwright 上传器。"""
 
+import asyncio
+
 from videopub.core.config_loader import load_platform_config
+from videopub.core.cover_utils import ensure_wechat_cover
 from videopub.core.models import Platform, PlatformTask, UploadResult
 from videopub.uploaders.base import BaseUploader
 from videopub.uploaders.browser_base import BrowserManager
@@ -15,12 +18,18 @@ class WeChatUploader(BaseUploader):
 
     async def check_session(self) -> bool:
         """检查视频号 Cookie 是否有效。"""
+        if not self.browser.cookie_path.exists():
+            return False
+
         try:
             await self.browser.launch(headless=True)
             from videopub.uploaders.wechat.pages.login_page import WeChatLoginPage
 
             login_page = WeChatLoginPage(self.browser.page)
-            return await login_page.is_logged_in()
+            valid = await login_page.is_logged_in()
+            if valid:
+                await self.browser.save_cookies()
+            return valid
         except Exception:
             return False
         finally:
@@ -48,7 +57,7 @@ class WeChatUploader(BaseUploader):
     async def upload(self, task: PlatformTask) -> UploadResult:
         """上传视频到视频号。"""
         try:
-            await self.browser.launch(headless=True)
+            await self.browser.launch(headless=False)
 
             from videopub.uploaders.wechat.pages.upload_page import WeChatUploadPage
 
@@ -65,6 +74,9 @@ class WeChatUploader(BaseUploader):
                 await upload_page.add_tags(meta.tags)
             if meta.short_title:
                 await upload_page.fill_short_title(meta.short_title)
+            collection_name = meta.collection or meta.category
+            if collection_name:
+                await upload_page.fill_collection(collection_name)
 
             default_original = self.config.get("default_original", True)
             is_original = meta.is_original if meta.is_original is not None else default_original
@@ -72,7 +84,8 @@ class WeChatUploader(BaseUploader):
                 await upload_page.set_original(True)
 
             if task.cover_path.exists():
-                await upload_page.upload_cover(str(task.cover_path))
+                cover_path = await asyncio.to_thread(ensure_wechat_cover, task.cover_path)
+                await upload_page.upload_cover(str(cover_path))
             if meta.scheduled_time:
                 await upload_page.set_schedule(meta.scheduled_time)
 

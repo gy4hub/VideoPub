@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from videopub.core.metadata_parser import _find_metadata_file, parse
+from videopub.core.metadata_parser import _find_cover_file, _find_metadata_file, parse
 from videopub.core.models import Platform
 
 
@@ -123,3 +123,11 @@ class TestFindMetadataFile:
         (tmp_path / "metadata.docx").write_bytes(b"")
         result = _find_metadata_file(tmp_path)
         assert result.suffix == ".json"
+
+
+class TestFindCoverFile:
+    def test_prefers_cover_named_image(self, tmp_path):
+        (tmp_path / "001.jpg").write_bytes(b"x")
+        (tmp_path / "视频封面.jpg").write_bytes(b"x")
+        result = _find_cover_file(tmp_path)
+        assert result.name == "视频封面.jpg"

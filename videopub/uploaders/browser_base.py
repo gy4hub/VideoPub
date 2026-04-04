@@ -1,4 +1,4 @@
-"""Playwright 浏览器管理基类。"""
+"""浏览器管理基类，支持 Playwright / Patchright。"""
 
 import json
 from datetime import datetime
@@ -9,18 +9,31 @@ from loguru import logger
 from videopub.core.config_loader import load_settings
 
 
-async def _ensure_playwright():
-    """延迟导入 playwright。"""
+async def _ensure_browser_driver(engine: str):
+    """按需导入对应浏览器驱动。"""
+    if engine == "patchright":
+        from patchright.async_api import async_playwright
+
+        return async_playwright
+
     from playwright.async_api import async_playwright
 
     return async_playwright
 
 
 class BrowserManager:
-    """管理 Playwright 浏览器实例、上下文与持久化状态。"""
+    """管理浏览器实例、上下文与持久化状态。"""
 
-    def __init__(self, cookie_path: Path | str):
+    def __init__(
+        self,
+        cookie_path: Path | str,
+        *,
+        engine: str = "playwright",
+        channel: str | None = None,
+    ):
         self.cookie_path = Path(cookie_path).expanduser()
+        self.engine = engine
+        self.channel = channel
         self._playwright = None
         self._browser = None
         self._context = None
@@ -35,16 +48,25 @@ class BrowserManager:
             headless = browser_config.get("headless", True)
         slow_mo = browser_config.get("slow_mo", 100)
 
-        async_playwright = await _ensure_playwright()
+        async_playwright = await _ensure_browser_driver(self.engine)
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(
-            headless=headless,
-            slow_mo=slow_mo,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
+        launch_kwargs = {
+            "headless": headless,
+            "slow_mo": slow_mo,
+            "args": ["--disable-blink-features=AutomationControlled"],
+        }
+        if self.channel:
+            launch_kwargs["channel"] = self.channel
+        self._browser = await self._playwright.chromium.launch(**launch_kwargs)
 
         if self.cookie_path.exists():
-            self._context = await self._browser.new_context(storage_state=str(self.cookie_path))
+            try:
+                self._context = await self._browser.new_context(
+                    storage_state=str(self.cookie_path)
+                )
+            except Exception as exc:
+                logger.warning(f"加载 storage state 失败，改用空白上下文: {exc}")
+                self._context = await self._browser.new_context()
         else:
             self._context = await self._browser.new_context()
 
