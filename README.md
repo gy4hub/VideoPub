@@ -26,6 +26,11 @@
 - 纯文本元数据与 Word / PDF 共用同一套 `key: value` + `[platform]` 语法
 - 元数据查找优先级更新为 `JSON > MD > TXT > DOCX > PDF`
 
+## Unreleased
+
+- 新增 `videopub-mcp`，可将 VideoPub 作为本地 MCP server 通过 stdio 暴露给 AI 工具调用
+- MCP tools 首批封装：版本查询、支持平台查询、文件夹解析、文件夹上传、平台登录、登录状态检查、文件夹状态读取
+
 ## 1.0.0 正式版
 
 - 已完成 `wechat`、`douyin`、`bilibili`、`youtube` 四平台真实发布联调
@@ -200,6 +205,40 @@ videopub watch ~/videos -p bilibili -p youtube
 ```
 
 **触发条件**：子目录同时包含视频文件（.mp4/.mov 等）和元数据文件（metadata.json/.md/.txt/.docx/.pdf）
+
+---
+
+## MCP Server
+
+VideoPub 现在可以作为一个本地 MCP server 运行，默认使用 `stdio` transport。
+
+安装依赖后可直接启动：
+
+```bash
+videopub-mcp
+```
+
+当前封装的 MCP tools：
+
+- `get_version`
+- `get_supported_platforms`
+- `parse_folder`
+- `upload_folder`
+- `login_platform`
+- `get_login_status`
+- `get_folder_status`
+
+如果你要把它接到支持 MCP 的客户端，命令通常可以直接写成：
+
+```json
+{
+  "mcpServers": {
+    "videopub": {
+      "command": "videopub-mcp"
+    }
+  }
+}
+```
 
 ---
 

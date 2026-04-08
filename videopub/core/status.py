@@ -22,6 +22,11 @@ def _status_file(folder_path: Path, platform: Platform) -> Path:
     return status_dir / f"{platform.value}.json"
 
 
+def _status_file_readonly(folder_path: Path, platform: Platform) -> Path:
+    """返回 .status/<platform>.json 路径，不创建目录。"""
+    return folder_path / ".status" / f"{platform.value}.json"
+
+
 def write_status(
     folder_path: Path,
     platform: Platform,
@@ -52,7 +57,7 @@ def write_status(
 
 def read_status(folder_path: Path, platform: Platform) -> StatusState | None:
     """读取平台状态，文件不存在时返回 None"""
-    sf = _status_file(folder_path, platform)
+    sf = _status_file_readonly(folder_path, platform)
     if not sf.exists():
         return None
     try:
@@ -64,7 +69,7 @@ def read_status(folder_path: Path, platform: Platform) -> StatusState | None:
 
 def read_status_detail(folder_path: Path, platform: Platform) -> dict | None:
     """读取平台状态的完整 JSON dict，文件不存在时返回 None"""
-    sf = _status_file(folder_path, platform)
+    sf = _status_file_readonly(folder_path, platform)
     if not sf.exists():
         return None
     try:

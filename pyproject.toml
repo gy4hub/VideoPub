@@ -9,6 +9,7 @@ description = "多平台视频发布自动化工具"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",
+    "mcp[cli]>=1.27.0",
     "pydantic>=2.0",
     "PyYAML>=6.0",
     "loguru>=0.7",
@@ -32,6 +33,7 @@ dev = [
 
 [project.scripts]
 videopub = "videopub.cli:cli"
+videopub-mcp = "videopub.mcp_server:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

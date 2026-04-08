@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- 新增 `videopub-mcp` stdio MCP server 封装
+- 暴露版本查询、平台查询、文件夹解析、上传执行、平台登录、登录状态和状态文件读取工具
+
 ## 1.1.0 - 2026-04-08
 
 - 新增 `metadata.md` 和 `metadata.txt` 元数据支持
