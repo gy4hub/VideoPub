@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "videopub"
-version = "1.0.0"
+version = "1.1.0"
 description = "多平台视频发布自动化工具"
 requires-python = ">=3.11"
 dependencies = [

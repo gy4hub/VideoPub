@@ -156,6 +156,9 @@ class WeChatUploadPage:
 
     async def upload_cover(self, cover_path: str):
         """上传自定义封面。"""
+        # 视频号在视频仍处于上传中时，右侧虽可能已出现封面预览，
+        # 但点击通常不会真正打开封面编辑弹层。
+        await self._wait_for_upload_to_finish(timeout_ms=600_000)
         before_hash = await self._capture_cover_preview_hash()
         await self._wait_for_cover_preview_ready()
         await self._open_cover_editor()

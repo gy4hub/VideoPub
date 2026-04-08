@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 - 2026-04-08
+
+- 新增 `metadata.md` 和 `metadata.txt` 元数据支持
+- 主解析器恢复为正式实现，并统一支持 JSON / Markdown / TXT / Word / PDF
+- 纯文本元数据与 Word / PDF 共用同一套 `key: value` + `[platform]` 解析规则
+- 元数据查找优先级更新为 `JSON > MD > TXT > DOCX > PDF`
+- README、CLI 版本输出和测试同步升级到 `1.1.0`
+
 ## 1.0.0 - 2026-04-05
 
 - 完成 `wechat`、`douyin`、`bilibili`、`youtube` 四平台真实发布联调

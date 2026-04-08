@@ -42,4 +42,4 @@ class TestCLIVersion:
     def test_version(self):
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert "1.0.0" in result.output
+        assert "1.1.0" in result.output

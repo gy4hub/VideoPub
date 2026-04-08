@@ -23,7 +23,7 @@ class PlatformMeta(BaseModel):
     title: str
     short_title: str | None = None
     description: str
-    tags: list[str] = Field(default_factory=list)
+    tags: list[str]
     first_comment: str | None = None
     is_original: bool = True
     scheduled_time: datetime | None = None

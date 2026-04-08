@@ -118,11 +118,51 @@ class TestFindMetadataFile:
         result = _find_metadata_file(tmp_path)
         assert result.name == "metadata.json"
 
+    def test_json_priority_over_md(self, tmp_path):
+        (tmp_path / "metadata.json").write_text("{}")
+        (tmp_path / "metadata.md").write_text("")
+        result = _find_metadata_file(tmp_path)
+        assert result.suffix == ".json"
+
+    def test_md_priority_over_txt(self, tmp_path):
+        (tmp_path / "metadata.md").write_text("")
+        (tmp_path / "metadata.txt").write_text("")
+        result = _find_metadata_file(tmp_path)
+        assert result.suffix == ".md"
+
+    def test_txt_priority_over_docx(self, tmp_path):
+        (tmp_path / "metadata.txt").write_text("")
+        (tmp_path / "metadata.docx").write_bytes(b"")
+        result = _find_metadata_file(tmp_path)
+        assert result.suffix == ".txt"
+
     def test_json_priority_over_docx(self, tmp_path):
         (tmp_path / "metadata.json").write_text("{}")
         (tmp_path / "metadata.docx").write_bytes(b"")
         result = _find_metadata_file(tmp_path)
         assert result.suffix == ".json"
+
+    def test_parse_md_priority_over_pdf(self, tmp_path):
+        (tmp_path / "video.mp4").write_bytes(b"video")
+        (tmp_path / "cover.jpg").write_bytes(b"cover")
+        (tmp_path / "metadata.md").write_text(
+            "[bilibili]\n标题: 来自 md\n描述: desc\n标签: 测试",
+            encoding="utf-8",
+        )
+        (tmp_path / "metadata.pdf").write_bytes(b"fake")
+        task = parse(tmp_path)
+        assert task.platforms[0].title == "来自 md"
+
+    def test_parse_txt_when_no_json_or_md(self, tmp_path):
+        (tmp_path / "video.mp4").write_bytes(b"video")
+        (tmp_path / "cover.jpg").write_bytes(b"cover")
+        (tmp_path / "metadata.txt").write_text(
+            "[bilibili]\n标题: 来自 txt\n描述: desc\n标签: #测试 #文本",
+            encoding="utf-8",
+        )
+        task = parse(tmp_path)
+        assert task.platforms[0].title == "来自 txt"
+        assert task.platforms[0].tags == ["测试", "文本"]
 
 
 class TestFindCoverFile:

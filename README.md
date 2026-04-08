@@ -1,6 +1,6 @@
 # VideoPub
 
-当前版本：`1.0.0`
+当前版本：`1.1.0`
 
 > 多平台视频发布自动化工具 — 一次操作，同步发布到微信视频号、抖音、Bilibili、YouTube
 
@@ -8,7 +8,7 @@
 
 ## 功能特性
 
-- 📄 **多格式元数据**：支持 JSON、Word (.docx)、PDF，字段名支持中英文
+- 📄 **多格式元数据**：支持 JSON、Markdown (.md)、TXT、Word (.docx)、PDF，字段名支持中英文
 - 🚀 **四平台发布**：微信视频号 / 抖音（Playwright）· Bilibili（biliup API）· YouTube（Data API v3）
 - 🔁 **幂等重发**：已完成的平台自动跳过，`.status/` 文件夹记录每个平台状态
 - 👀 **文件夹监控**：`watch` 命令监控目录，新视频自动触发上传
@@ -19,6 +19,12 @@
 - 🍎 **macOS 守护进程**：一键安装为 launchd 服务，开机自动运行
 
 ---
+
+## 1.1.0
+
+- 新增 `metadata.md` 和 `metadata.txt` 支持
+- 纯文本元数据与 Word / PDF 共用同一套 `key: value` + `[platform]` 语法
+- 元数据查找优先级更新为 `JSON > MD > TXT > DOCX > PDF`
 
 ## 1.0.0 正式版
 
@@ -64,7 +70,7 @@ playwright install chromium
 my_video/
 ├── video.mp4           # 视频文件（支持 .mp4 .mov .avi .mkv）
 ├── cover.jpg           # 封面图（支持 .jpg .png .webp）
-└── metadata.json       # 元数据文件
+└── metadata.json       # 元数据文件（也支持 metadata.md/.txt/.docx/.pdf）
 ```
 
 封面处理规则：
@@ -117,7 +123,7 @@ my_video/
 }
 ```
 
-### 3. 或使用 Word / PDF（支持中文字段名）
+### 3. 或使用 Markdown / TXT / Word / PDF（支持中文字段名）
 
 ```
 视频路径: video.mp4
@@ -141,6 +147,8 @@ my_video/
 描述: 手把手教你避开这三个坑
 标签: 磁珠, 实验技巧
 ```
+
+`metadata.md` 和 `metadata.txt` 与 Word / PDF 使用同样的 KV 文本语法，最适合版本管理和快速编辑。
 
 如果你的封面是竖图，例如 `封面.jpg`，上传前可能会自动在同目录生成：
 
@@ -191,7 +199,7 @@ videopub watch ~/videos
 videopub watch ~/videos -p bilibili -p youtube
 ```
 
-**触发条件**：子目录同时包含视频文件（.mp4/.mov 等）和元数据文件（metadata.json/.docx/.pdf）
+**触发条件**：子目录同时包含视频文件（.mp4/.mov 等）和元数据文件（metadata.json/.md/.txt/.docx/.pdf）
 
 ---
 
@@ -320,7 +328,7 @@ videopub/
 ├── logging_config.py          # loguru 日志配置
 ├── core/
 │   ├── models.py              # Pydantic 数据模型
-│   ├── metadata_parser.py     # JSON / Word / PDF 解析
+│   ├── metadata_parser.py     # JSON / Markdown / TXT / Word / PDF 解析
 │   ├── config_loader.py       # YAML 配置加载
 │   ├── orchestrator.py        # 发布调度器
 │   ├── status.py              # .status 文件管理

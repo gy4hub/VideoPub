@@ -1,4 +1,4 @@
-"""Word (.docx) 和 PDF 元数据解析测试"""
+"""文本 / Word (.docx) / PDF 元数据解析测试"""
 
 import json
 import textwrap
@@ -144,6 +144,28 @@ class TestParseDocx:
         task = parse(docx_folder)
         yt = next(p for p in task.platforms if p.platform == Platform.YOUTUBE)
         assert yt.scheduled_time is not None
+
+
+class TestParseTextMetadata:
+    def test_parse_md_two_platforms(self, tmp_path):
+        folder = make_folder(tmp_path, KV_SAMPLE, suffix=".md")
+        task = parse(folder)
+        assert len(task.platforms) == 2
+        assert next(p for p in task.platforms if p.platform == Platform.BILIBILI).title == "磁珠纯化误区"
+
+    def test_parse_txt_fullwidth_colon_and_collection(self, tmp_path):
+        (tmp_path / "video.mp4").write_bytes(b"x")
+        (tmp_path / "cover.jpg").write_bytes(b"x")
+        text = "[微信视频号]\n标题：t\n短标题：短标题\n描述：d\n分类：家庭健康避坑\n标签：#血压计 #高血压 #健康\n定时发布：2026-04-05 21:00"
+        (tmp_path / "metadata.txt").write_text(text, encoding="utf-8")
+        task = parse(tmp_path)
+        wechat = task.platforms[0]
+        assert wechat.platform == Platform.WECHAT
+        assert wechat.short_title == "短标题"
+        assert wechat.collection == "家庭健康避坑"
+        assert wechat.tags == ["血压计", "高血压", "健康"]
+        assert wechat.scheduled_time is not None
+        assert wechat.scheduled_time.hour == 21
 
 
 # ── PDF 解析（通过 reportlab 构造文件）──────────────────────────────────────
