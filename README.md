@@ -29,7 +29,8 @@
 ## Unreleased
 
 - 新增 `videopub-mcp`，可将 VideoPub 作为本地 MCP server 通过 stdio 暴露给 AI 工具调用
-- MCP tools 首批封装：版本查询、支持平台查询、文件夹解析、文件夹上传、平台登录、登录状态检查、文件夹状态读取
+- MCP tools 已扩展为：版本查询、平台查询、目录校验、可发布目录发现、文件夹解析、文件夹上传、平台登录、登录状态检查、配置读取、文件夹状态读取
+- MCP server 现支持 `stdio`、`sse`、`streamable-http` 三种 transport
 
 ## 1.0.0 正式版
 
@@ -210,7 +211,7 @@ videopub watch ~/videos -p bilibili -p youtube
 
 ## MCP Server
 
-VideoPub 现在可以作为一个本地 MCP server 运行，默认使用 `stdio` transport。
+VideoPub 现在可以作为一个本地 MCP server 运行，支持 `stdio`、`sse`、`streamable-http`，默认使用 `stdio`。
 
 安装依赖后可直接启动：
 
@@ -218,14 +219,24 @@ VideoPub 现在可以作为一个本地 MCP server 运行，默认使用 `stdio`
 videopub-mcp
 ```
 
+也可以直接跑成 HTTP：
+
+```bash
+videopub-mcp --transport streamable-http --host 127.0.0.1 --port 8000
+```
+
 当前封装的 MCP tools：
 
 - `get_version`
 - `get_supported_platforms`
+- `validate_folder`
+- `list_publishable_folders`
 - `parse_folder`
 - `upload_folder`
 - `login_platform`
 - `get_login_status`
+- `get_settings`
+- `get_platform_config`
 - `get_folder_status`
 
 如果你要把它接到支持 MCP 的客户端，命令通常可以直接写成：

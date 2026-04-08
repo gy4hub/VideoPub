@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- 新增 `videopub-mcp` stdio MCP server 封装
-- 暴露版本查询、平台查询、文件夹解析、上传执行、平台登录、登录状态和状态文件读取工具
+- 新增 `videopub-mcp` MCP server 封装
+- 支持 `stdio`、`sse`、`streamable-http` transport
+- 暴露版本查询、平台查询、目录校验、可发布目录发现、文件夹解析、上传执行、平台登录、登录状态、配置读取和状态文件读取工具
 
 ## 1.1.0 - 2026-04-08
 
